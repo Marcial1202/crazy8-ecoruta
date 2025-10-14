@@ -188,18 +188,30 @@
             const payload = { name, ideas };
 
             try {
+                // CORRECCIÓN: Se ha eliminado 'mode: no-cors' para obtener una respuesta real del servidor.
                 const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors', // Para evitar problemas de CORS con Apps Script
+                    redirect: 'follow', // Sigue las redirecciones de Apps Script
                     cache: 'no-cache',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8', // Usar text/plain es a veces más robusto para Apps Script
+                    },
                     body: JSON.stringify(payload)
                 });
+                
+                // Si la respuesta del servidor no es OK (ej. 404, 500), lanzará un error.
+                if (!response.ok) {
+                   throw new Error(`Error de red: ${response.status} ${response.statusText}`);
+                }
+                
+                // Si la red está OK, asumimos éxito.
                 showStatusMessage('¡Respuestas enviadas con éxito!', 'green');
                 closeModal();
+
             } catch (error) {
-                console.error('Error sending data:', error);
-                showStatusMessage('Error al enviar. Inténtalo de nuevo.', 'red');
+                console.error('Error al enviar los datos:', error);
+                // Este mensaje es clave para que el usuario pueda depurar el problema.
+                showStatusMessage('Error. Revisa la consola del navegador (F12) para más detalles.', 'red', 8000);
             } finally {
                 loadingSpinner.classList.add('hidden');
                 confirmBtnText.textContent = 'Confirmar y Enviar';
