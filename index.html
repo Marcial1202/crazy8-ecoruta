@@ -100,6 +100,7 @@
         let timer;
         let timeInSeconds = 8 * 60;
         let isTimerRunning = false;
+        let audioReady = false; // Para controlar el estado del audio
 
         const prompts = ["Otro sector: ¿Qué harían en...?", "Sin límite de presupuesto", "Sin invertir 1 dólar", "La peor idea (anti-requisito)", "100% digital", "100% análoga", "Hace 50 años", "Dentro de 50 años"];
         const colors = [
@@ -188,29 +189,25 @@
             const payload = { name, ideas };
 
             try {
-                // CORRECCIÓN: Se ha eliminado 'mode: no-cors' para obtener una respuesta real del servidor.
                 const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
                     method: 'POST',
-                    redirect: 'follow', // Sigue las redirecciones de Apps Script
+                    redirect: 'follow', 
                     cache: 'no-cache',
                     headers: {
-                        'Content-Type': 'text/plain;charset=utf-8', // Usar text/plain es a veces más robusto para Apps Script
+                        'Content-Type': 'text/plain;charset=utf-8',
                     },
                     body: JSON.stringify(payload)
                 });
                 
-                // Si la respuesta del servidor no es OK (ej. 404, 500), lanzará un error.
                 if (!response.ok) {
                    throw new Error(`Error de red: ${response.status} ${response.statusText}`);
                 }
                 
-                // Si la red está OK, asumimos éxito.
                 showStatusMessage('¡Respuestas enviadas con éxito!', 'green');
                 closeModal();
 
             } catch (error) {
                 console.error('Error al enviar los datos:', error);
-                // Este mensaje es clave para que el usuario pueda depurar el problema.
                 showStatusMessage('Error. Revisa la consola del navegador (F12) para más detalles.', 'red', 8000);
             } finally {
                 loadingSpinner.classList.add('hidden');
@@ -219,7 +216,18 @@
             }
         }
 
-        // --- Lógica del Temporizador (sin cambios) ---
+        // --- Lógica del Temporizador (con corrección de audio) ---
+        async function setupAudio() {
+            if (audioReady || typeof Tone === 'undefined') return;
+            try {
+                await Tone.start();
+                audioReady = true;
+                console.log('Contexto de audio iniciado por el usuario.');
+            } catch (e) {
+                console.error('No se pudo iniciar el contexto de audio:', e);
+            }
+        }
+
         function updateDisplay() {
             const minutes = Math.floor(timeInSeconds / 60);
             const seconds = timeInSeconds % 60;
@@ -262,15 +270,22 @@
         }
 
         startButton.addEventListener('click', () => {
+            if (!audioReady) {
+                setupAudio();
+            }
             if (startButton.textContent === "Reiniciar") { resetTimer(); } else { startTimer(); }
         });
         
         function playNotificationSound(volume = 0.5) {
+            if (!audioReady) {
+                console.log("El contexto de audio no está listo. Se omitirá el sonido.");
+                return;
+            }
             try {
-                const synth = new (window.Tone.Synth)().toDestination();
-                synth.triggerAttackRelease("C5", "8n", window.Tone.now(), volume);
+                const synth = new Tone.Synth().toDestination();
+                synth.triggerAttackRelease("C5", "8n", Tone.now(), volume);
             } catch (e) {
-                console.log("Audio context not available for sound notification.");
+                console.error("Error al reproducir el sonido:", e);
             }
         }
         
